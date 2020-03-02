@@ -9,7 +9,7 @@ let db = admin.firestore();
 
 
 app.intent('Add Activity', async (conv, {activity_name}) => {
-  let collectionRef = db.collection('activites');
+  let collectionRef = db.collection('activities');
   await collectionRef.add({
     name: activity_name,
     total_seconds: 0,
