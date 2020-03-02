@@ -15,19 +15,19 @@ app.intent('Add Time Sink', async (conv, {task_name}) => {
     total_seconds: 0,
     start_time: null
   });
-  conv.close(`Successfully added the new time sink: ${task_name}`);
+  conv.ask(`Successfully added the new time sink: ${task_name}`);
 });
 
 app.intent('List Time Sinks', async (conv) => {
   const timeSinks = await db.collection('time_sinks').get();
   const names = timeSinks.docs.map(doc => doc.data().name);
-  conv.close(`Here are your time sinks: ${names}`);
+  conv.ask(`Here are your time sinks: ${names}`);
 });
 
 app.intent('Start Time Sink', async (conv, {task_name}) => {
   const timeSinks = await db.collection('time_sinks').where('name', '==', task_name).limit(1).get();
   if (timeSinks.empty) {
-    conv.close(`No time sink named: ${task_name}`);
+    conv.ask(`No time sink named: ${task_name}`);
     return;
   }
   const timeSink = timeSinks.docs[0];
@@ -35,13 +35,13 @@ app.intent('Start Time Sink', async (conv, {task_name}) => {
   await timeSinkRef.set({
     start_time: Date.now()
   }, {merge: true});
-  conv.close(`Started time sink: ${task_name}`);
+  conv.ask(`Started time sink: ${task_name}`);
 });
 
 app.intent('Stop Time Sink', async (conv, {task_name}) => {
   const timeSinks = await db.collection('time_sinks').where('name', '==', task_name).limit(1).get();
   if (timeSinks.empty) {
-    conv.close(`No time sink named: ${task_name}`);
+    conv.ask(`No time sink named: ${task_name}`);
     return;
   }
   const timeSink = timeSinks.docs[0];
@@ -49,7 +49,7 @@ app.intent('Stop Time Sink', async (conv, {task_name}) => {
   const startTime = timeSink.data().start_time;
   const totalSeconds = timeSink.data().total_seconds;
   if (startTime === null) {
-    conv.close(`You had not started the task: ${task_name}`);
+    conv.ask(`You had not started the task: ${task_name}`);
     return;
   }
   const sessionSeconds = Math.floor((Date.now() - startTime) /1000);
@@ -58,17 +58,17 @@ app.intent('Stop Time Sink', async (conv, {task_name}) => {
     start_time: null,
     total_seconds: seconds
   }, {merge: true});
-  conv.close(`You spent ${secondsToTimePhrase(sessionSeconds)} ${task_name}`);
+  conv.ask(`You spent ${secondsToTimePhrase(sessionSeconds)} ${task_name}`);
 });
 
 app.intent('How Long Have I Spent', async (conv, {task_name}) => {
   const timeSinks = await db.collection('time_sinks').where('name', '==', task_name).limit(1).get();
   if (timeSinks.empty) {
-    conv.close(`No time sink named: ${task_name}`);
+    conv.ask(`No time sink named: ${task_name}`);
     return;
   }
   const seconds = timeSinks.docs[0].data().total_seconds;
-  conv.close(`You have spent a total of ${secondsToTimePhrase(seconds)} ${task_name}`);
+  conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${task_name}`);
 });
 
 const secondsToTimePhrase = (seconds) => {
