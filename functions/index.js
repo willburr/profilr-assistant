@@ -1,16 +1,18 @@
-const admin = require("firebase-admin");
 const functions = require('firebase-functions');
 const {dialogflow} = require('actions-on-google');
 const app = dialogflow({ debug: true });
 
-admin.initializeApp(functions.config().firebase);
-
-let db = admin.firestore();
-
+app.intent('Welcome Intent', async (conv) => {
+  if (conv.user.storage.activities) {
+    conv.ask("Hi again! How can I help?");
+  } else {
+    conv.ask("Hi. I am Profiler, why don't you ask me to start profiling a new activity?")
+    conv.user.storage.activities = [];
+  }
+});
 
 app.intent('Add Activity', async (conv, {activity_name}) => {
-  let collectionRef = db.collection('activities');
-  await collectionRef.add({
+  conv.user.storage.activities.push({
     name: activity_name,
     total_seconds: 0,
     start_time: null
@@ -19,54 +21,43 @@ app.intent('Add Activity', async (conv, {activity_name}) => {
 });
 
 app.intent('List Activities', async (conv) => {
-  const activities = await db.collection('activities').get();
-  const names = activities.docs.map(doc => doc.data().name);
+  const names = conv.user.storage.activities.map(doc => doc.data().name);
   conv.ask(`Your profiled activities are: ${names}`);
 });
 
 app.intent('Start Activity', async (conv, {activity_name}) => {
-  const activities = await db.collection('activities').where('name', '==', activity_name).limit(1).get();
-  if (activities.empty) {
-    conv.ask(`No activity named: ${activity_name}`);
-    return;
+  if (!(activity_name in conv.user.storage.activities)) {
+    conv.ask(`No activity named ${activity_name}`);
   }
-  const timeSink = activities.docs[0];
-  const timeSinkRef = timeSink.ref;
-  await timeSinkRef.set({
-    start_time: Date.now()
-  }, {merge: true});
+  conv.user.storage.activities[activity_name].start_time = Date.now();
   conv.ask(`Started profiling activity: ${activity_name}`);
 });
 
 app.intent('Stop Activity', async (conv, {activity_name}) => {
-  const activities = await db.collection('activities').where('name', '==', activity_name).limit(1).get();
-  if (activities.empty) {
-    conv.ask(`No activity named: ${activity_name}`);
-    return;
+  const activities = conv.user.storage.activities;
+  if (!(activity_name in activities)) {
+    conv.ask(`No activity named ${activity_name}`);
   }
-  const activity = activities.docs[0];
-  const startTime = activity.data().start_time;
-  const totalSeconds = activity.data().total_seconds;
+  const activity = activities[activity_name];
+  const startTime = activity.start_time;
+  const totalSeconds = activity.total_seconds;
   if (startTime === null) {
     conv.ask(`You have not started ${activity_name} yet.`);
     return;
   }
   const sessionSeconds = Math.floor((Date.now() - startTime) /1000);
   const seconds = totalSeconds + sessionSeconds;
-  await activity.ref.set({
-    start_time: null,
-    total_seconds: seconds
-  }, {merge: true});
+  conv.user.storage.activities[activity_name].start_time = null;
+  conv.user.storage.activities[activity_name].total_seconds = seconds;
   conv.ask(`You spent ${secondsToTimePhrase(sessionSeconds)} ${activity_name}`);
 });
 
 app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
-  const activities = await db.collection('activities').where('name', '==', activity_name).limit(1).get();
-  if (activities.empty) {
-    conv.ask(`No activity named: ${activity_name}`);
-    return;
+  const activities = conv.user.storage.activities;
+  if (!(activity_name in activities)) {
+    conv.ask(`No activity named ${activity_name}`);
   }
-  const seconds = activities.docs[0].data().total_seconds;
+  const seconds = activities[activity_name].total_seconds;
   conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 
