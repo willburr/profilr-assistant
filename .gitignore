@@ -1,3 +1,4 @@
 /.firebaserc
 functions/node_modules/
 .idea
+/functions/.env
