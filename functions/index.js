@@ -4,12 +4,41 @@ const {dialogflow} = require('actions-on-google');
 const app = dialogflow({ debug: true });
 
 admin.initializeApp(functions.config().firebase);
+const auth = admin.auth();
 
 let db = admin.firestore();
 
+// Retrieve the user's favorite color if an account exists, ask if it doesn't.
+app.intent('Welcome Intent', async (conv) => {
+  conv.ask(new SignIn('In order to save your Profile'));
+});
+
+// Save the user in the Firestore DB after successful signin
+app.intent('Get Sign In', async (conv, params, signin) => {
+  if (signin.status !== 'OK') {
+    conv.close(`Let's try again next time.`);
+    return;
+  }
+  const {email} = conv.user;
+  if (!conv.data.uid && email) {
+    try {
+      conv.data.uid = (await auth.getUserByEmail(email)).uid;
+    } catch (e) {
+      if (e.code !== 'auth/user-not-found') {
+        throw e;
+      }
+      // If the user is not found, create a new Firebase auth user
+      // using the email obtained from the Google Assistant
+      conv.data.uid = (await auth.createUser({email})).uid;
+    }
+  }
+  if (conv.data.uid) {
+    conv.user.ref = db.collection('users').doc(conv.data.uid);
+  }
+});
 
 app.intent('Add Activity', async (conv, {activity_name}) => {
-  let collectionRef = db.collection('activites');
+  let collectionRef = db.collection('activities');
   await collectionRef.add({
     name: activity_name,
     total_seconds: 0,
