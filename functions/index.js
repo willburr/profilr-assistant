@@ -60,14 +60,29 @@ app.intent('List Activities', async (conv) => {
 });
 
 app.intent('Start Activity', async (conv, {activity_name}) => {
-  const activityRef = db.collection('users')
-    .doc(conv.data.uid)
-    .collection('activities').doc(activity_name);
+  const userRef = db.collection('users').doc(conv.data.uid);
+
+  // Check if any activity is already started
+  const startActivity = await userRef.get();
+  const existingActivity = startActivity.data().activity_in_progress;
+  if (existingActivity){
+    conv.ask(`${existingActivity} is already in progress.`);
+    return;
+  }
+  // Get the activity to start
+  const activityRef = userRef.collection('activities').doc(activity_name);
   const activity = await activityRef.get();
+
   if (!activity.exists) {
     conv.ask(`${activity_name} is not an activity in your Profile`);
     return
   }
+  // Set activity to start
+  await userRef.set({
+    activity_in_progress: activity_name
+  }, {merge: true});
+
+  // Start timing the activity
   await activityRef.set({
     start_time: Date.now()
   }, {merge: true});
@@ -75,26 +90,41 @@ app.intent('Start Activity', async (conv, {activity_name}) => {
 });
 
 app.intent('Stop Activity', async (conv, {activity_name}) => {
-  const activityRef = db.collection('users')
-    .doc(conv.data.uid)
-    .collection('activities').doc(activity_name);
+  const userRef = db.collection('users').doc(conv.data.uid);
+
+  // Check the activity has been started (and no other has been)
+  const startActivity = await userRef.get();
+  const existingActivity = startActivity.data().activity_in_progress;
+  if (existingActivity !== activity_name){
+    conv.ask(`A different activity is in progress: ${existingActivity}.`);
+    return;
+  }
+
+  // Get the activity to stop
+  const activityRef = userRef.collection('activities').doc(activity_name);
   const activity = await activityRef.get();
   if (!activity.exists) {
     conv.ask(`${activity_name} is not an activity in your Profile`);
     return
   }
+  // Check if activity is started
   const startTime = activity.data().start_time;
   const totalSeconds = activity.data().total_seconds;
-  if (startTime === null) {
-    conv.ask(`You have not started ${activity_name} yet.`);
-    return;
-  }
   const sessionSeconds = Math.floor((Date.now() - startTime) /1000);
   const seconds = totalSeconds + sessionSeconds;
+
+  // Stop the activity
+  // Remove the in progress activity
+  await userRef.set({
+    activity_in_progress: null
+  }, {merge: true});
+
+  // Set the new time profile for the activity
   await activityRef.set({
     start_time: null,
     total_seconds: seconds
   }, {merge: true});
+
   conv.ask(`You spent ${secondsToTimePhrase(sessionSeconds)} ${activity_name}`);
 });
 
