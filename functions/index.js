@@ -21,7 +21,7 @@ app.intent('Add Activity', async (conv, {activity_name}) => {
 });
 
 app.intent('List Activities', async (conv) => {
-  const names = conv.user.storage.activities.map(doc => doc.data().name);
+  const names = conv.user.storage.activities.map(activity => activity.name);
   conv.ask(`Your profiled activities are: ${names}`);
 });
 
