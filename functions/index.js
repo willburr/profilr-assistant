@@ -3,7 +3,7 @@ const functions = require('firebase-functions');
 const {dialogflow, SignIn} = require('actions-on-google');
 const app = dialogflow({
   debug: true,
-  clientId: process.env.CLIENT_ID
+  clientId: functions.config().profilr.id
 });
 
 admin.initializeApp(functions.config().firebase);
@@ -11,13 +11,8 @@ const auth = admin.auth();
 
 let db = admin.firestore();
 
-// Retrieve the user's favorite color if an account exists, ask if it doesn't.
-app.intent('Welcome Intent', async (conv) => {
-  if (conv.user.verification !== 'VERIFIED') {
-    conv.close(`Hi! You'll need to be a verified user to use this sample`);
-    return;
-  }
-  conv.ask(new SignIn('In order to save your Profile'));
+app.intent('Welcome Intent', (conv) => {
+  conv.ask(new SignIn('In order to save your Profile'))
 });
 
 app.intent('Get Signin', async (conv, params, signin) => {
@@ -38,15 +33,19 @@ app.intent('Get Signin', async (conv, params, signin) => {
       conv.data.uid = (await auth.createUser({email})).uid;
     }
   }
-  if (conv.data.uid) {
-    conv.user.ref = db.collection('users').doc(conv.data.uid);
-  }
+  conv.ask(`Hi ${conv.user.profile.payload.name}! What are you up to?`);
 });
 
 app.intent('Add Activity', async (conv, {activity_name}) => {
-  let collectionRef = db.collection('activities');
-  await collectionRef.add({
-    name: activity_name,
+  const activityRef = db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').doc(activity_name);
+  const activity = await activityRef.get();
+  if (activity.exists) {
+    conv.ask(`${activity_name} is already an activity in your Profile`);
+    return
+  }
+  await activityRef.set({
     total_seconds: 0,
     start_time: null
   });
@@ -54,32 +53,36 @@ app.intent('Add Activity', async (conv, {activity_name}) => {
 });
 
 app.intent('List Activities', async (conv) => {
-  const activities = await db.collection('activities').get();
-  const names = activities.docs.map(doc => doc.data().name);
-  conv.ask(`Your profiled activities are: ${names}`);
+  const activities = await db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').get();
+  conv.ask(`Your profiled activities are: ${activities.docs.map(doc => doc.id)}`);
 });
 
 app.intent('Start Activity', async (conv, {activity_name}) => {
-  const activities = await db.collection('activities').where('name', '==', activity_name).limit(1).get();
-  if (activities.empty) {
-    conv.ask(`No activity named: ${activity_name}`);
-    return;
+  const activityRef = db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').doc(activity_name);
+  const activity = await activityRef.get();
+  if (!activity.exists) {
+    conv.ask(`${activity_name} is not an activity in your Profile`);
+    return
   }
-  const timeSink = activities.docs[0];
-  const timeSinkRef = timeSink.ref;
-  await timeSinkRef.set({
+  await activityRef.set({
     start_time: Date.now()
   }, {merge: true});
   conv.ask(`Started profiling activity: ${activity_name}`);
 });
 
 app.intent('Stop Activity', async (conv, {activity_name}) => {
-  const activities = await db.collection('activities').where('name', '==', activity_name).limit(1).get();
-  if (activities.empty) {
-    conv.ask(`No activity named: ${activity_name}`);
-    return;
+  const activityRef = db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').doc(activity_name);
+  const activity = await activityRef.get();
+  if (!activity.exists) {
+    conv.ask(`${activity_name} is not an activity in your Profile`);
+    return
   }
-  const activity = activities.docs[0];
   const startTime = activity.data().start_time;
   const totalSeconds = activity.data().total_seconds;
   if (startTime === null) {
@@ -88,7 +91,7 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
   }
   const sessionSeconds = Math.floor((Date.now() - startTime) /1000);
   const seconds = totalSeconds + sessionSeconds;
-  await activity.ref.set({
+  await activityRef.set({
     start_time: null,
     total_seconds: seconds
   }, {merge: true});
@@ -96,12 +99,15 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
 });
 
 app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
-  const activities = await db.collection('activities').where('name', '==', activity_name).limit(1).get();
-  if (activities.empty) {
-    conv.ask(`No activity named: ${activity_name}`);
-    return;
+  const activityRef = db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').doc(activity_name);
+  const activity = await activityRef.get();
+  if (!activity.exists) {
+    conv.ask(`${activity_name} is not an activity in your Profile`);
+    return
   }
-  const seconds = activities.docs[0].data().total_seconds;
+  const seconds = activity.data().total_seconds;
   conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 
