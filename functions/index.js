@@ -7,21 +7,20 @@ app.intent('Welcome Intent', async (conv) => {
     conv.ask("Hi again! How can I help?");
   } else {
     conv.ask("Hi. I am Profiler, why don't you ask me to start profiling a new activity?");
-    conv.user.storage.activities = [];
+    conv.user.storage.activities = {};
   }
 });
 
 app.intent('Add Activity', async (conv, {activity_name}) => {
-  conv.user.storage.activities.push({
-    name: activity_name,
+  conv.user.storage.activities[activity_name] = {
     total_seconds: 0,
     start_time: null
-  });
+  };
   conv.ask(`Successfully added a new activity called: ${activity_name}`);
 });
 
 app.intent('List Activities', async (conv) => {
-  const names = conv.user.storage.activities.map(activity => activity.name);
+  const names = conv.user.storage.activities.keys().map(activity => activity.name);
   conv.ask(`Your profiled activities are: ${names}`);
 });
 
