@@ -6,7 +6,7 @@ app.intent('Welcome Intent', async (conv) => {
   if (conv.user.storage.activities) {
     conv.ask("Hi again! How can I help?");
   } else {
-    conv.ask("Hi. I am Profiler, why don't you ask me to start profiling a new activity?")
+    conv.ask("Hi. I am Profiler, why don't you ask me to start profiling a new activity?");
     conv.user.storage.activities = [];
   }
 });
