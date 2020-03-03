@@ -1,7 +1,10 @@
 const admin = require("firebase-admin");
 const functions = require('firebase-functions');
-const {dialogflow} = require('actions-on-google');
-const app = dialogflow({ debug: true });
+const {dialogflow, SignIn} = require('actions-on-google');
+const app = dialogflow({
+  debug: true,
+  clientId: process.env.CLIENT_ID
+});
 
 admin.initializeApp(functions.config().firebase);
 const auth = admin.auth();
@@ -10,11 +13,14 @@ let db = admin.firestore();
 
 // Retrieve the user's favorite color if an account exists, ask if it doesn't.
 app.intent('Welcome Intent', async (conv) => {
+  if (conv.user.verification !== 'VERIFIED') {
+    conv.close(`Hi! You'll need to be a verified user to use this sample`);
+    return;
+  }
   conv.ask(new SignIn('In order to save your Profile'));
 });
 
-// Save the user in the Firestore DB after successful signin
-app.intent('Get Sign In', async (conv, params, signin) => {
+app.intent('Get Signin', async (conv, params, signin) => {
   if (signin.status !== 'OK') {
     conv.close(`Let's try again next time.`);
     return;
