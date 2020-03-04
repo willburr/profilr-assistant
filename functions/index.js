@@ -94,7 +94,8 @@ app.intent('Current Activity', async (conv) => {
     .doc(conv.data.uid).get();
   const activity = userRef.data().activity_in_progress;
   if (!activity) {
-    conv.ask('You have no activity in progress.')
+    conv.ask('You have no activity in progress.');
+    return;
   }
   conv.ask(`You are currently ${activity}.`);
 });
@@ -143,7 +144,10 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
   // Check the activity has been started (and no other has been)
   const startActivity = await userRef.get();
   const existingActivity = startActivity.data().activity_in_progress;
-  if (existingActivity !== activity_name){
+  if (!existingActivity) {
+    conv.ask('There is no activity in progress.');
+    return;
+  } else if (existingActivity !== activity_name){
     conv.ask(`A different activity is in progress: ${existingActivity}.`);
     return;
   }
