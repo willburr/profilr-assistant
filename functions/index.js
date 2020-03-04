@@ -1,5 +1,6 @@
 const admin = require("firebase-admin");
 const functions = require('firebase-functions');
+const { secondsToTimePhrase } = require('./utils');
 const {dialogflow, SignIn} = require('actions-on-google');
 const app = dialogflow({
   debug: true,
@@ -141,18 +142,4 @@ app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
   conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 
-const secondsToTimePhrase = (seconds) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainderSeconds = seconds % 60;
-  let phrase = "";
-  if (minutes !== 0) {
-    const plural = minutes === 1 ? '' : 's';
-    phrase += `${minutes} minute${plural} and `;
-  }
-  phrase += `${remainderSeconds} seconds`;
-  return phrase;
-};
-
-
-
-exports.profilrFulfillment = functions.https.onRequest(app);
+module.exports.profilrFulfillment = functions.https.onRequest(app);
