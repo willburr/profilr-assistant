@@ -1,3 +1,4 @@
+const MILLISECONDS_IN_SECONDS = 1000;
 const SECONDS_IN_HOUR = 3600;
 const SECONDS_IN_MINUTE = 60;
 
@@ -26,4 +27,13 @@ const secondsToTimePhrase = (seconds) => {
   return phrase;
 };
 
-module.exports = { secondsToTimePhrase };
+const activityDuration = activity => {
+  let seconds = activity.total_seconds;
+  const startTime = activity.start_time;
+  if (startTime) {
+    seconds += Math.floor((Date.now() - startTime) / MILLISECONDS_IN_SECONDS);
+  }
+  return seconds;
+};
+
+module.exports = { secondsToTimePhrase, activityDuration };

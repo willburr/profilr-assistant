@@ -1,6 +1,6 @@
-const admin = require("firebase-admin");
+const admin = require('firebase-admin');
 const functions = require('firebase-functions');
-const { secondsToTimePhrase } = require('./utils');
+const { secondsToTimePhrase, activityDuration } = require('./utils');
 const {dialogflow, SignIn} = require('actions-on-google');
 const app = dialogflow({
   debug: true,
@@ -10,7 +10,8 @@ const app = dialogflow({
 admin.initializeApp(functions.config().firebase);
 const auth = admin.auth();
 
-let db = admin.firestore();
+const db = admin.firestore();
+
 
 app.intent('Welcome Intent', (conv) => {
   conv.ask(new SignIn('In order to save your Profile'))
@@ -53,6 +54,8 @@ app.intent('Add Activity', async (conv, {activity_name}) => {
   conv.ask(`Successfully added a new activity called: ${activity_name}`);
 });
 
+// Remove Activity
+
 app.intent('Remove Activity', async (conv, {activity_name}) => {
   const activityRef = db.collection('users')
     .doc(conv.data.uid)
@@ -62,8 +65,21 @@ app.intent('Remove Activity', async (conv, {activity_name}) => {
     conv.ask(`${activity_name} is not an activity in your Profile`);
     return
   }
+  conv.data.activity_name = activity_name;
+  conv.ask(`Are you sure you wish to remove ${activity_name} from your profiled activities?`);
+});
+
+app.intent('Remove Activity - yes', async (conv) => {
+  const activity_name = conv.data.activity_name;
+  const activityRef = db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').doc(activity_name);
   await activityRef.delete();
-  conv.ask(`Successfully removed the activity: ${activity_name}`);
+  conv.ask(`Successfully removed ${activity_name} from your activities.`);
+});
+
+app.intent('Remove Activity - no', async (conv) => {
+  conv.ask(`Ok.`);
 });
 
 app.intent('List Activities', async (conv) => {
@@ -71,6 +87,16 @@ app.intent('List Activities', async (conv) => {
     .doc(conv.data.uid)
     .collection('activities').get();
   conv.ask(`Your profiled activities are: ${activities.docs.map(doc => doc.id)}`);
+});
+
+app.intent('Current Activity', async (conv) => {
+  const userRef = await db.collection('users')
+    .doc(conv.data.uid).get();
+  const activity = userRef.data().activity_in_progress;
+  if (!activity) {
+    conv.ask('You have no activity in progress.')
+  }
+  conv.ask(`You are currently ${activity}.`);
 });
 
 app.intent('Full Profile', async (conv) => {
@@ -97,7 +123,7 @@ app.intent('Start Activity', async (conv, {activity_name}) => {
 
   if (!activity.exists) {
     conv.ask(`${activity_name} is not an activity in your Profile`);
-    return
+    return;
   }
   // Set activity to start
   await userRef.set({
@@ -127,13 +153,10 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
   const activity = await activityRef.get();
   if (!activity.exists) {
     conv.ask(`${activity_name} is not an activity in your Profile`);
-    return
+    return;
   }
-  // Check if activity is started
-  const startTime = activity.data().start_time;
-  const totalSeconds = activity.data().total_seconds;
-  const sessionSeconds = Math.floor((Date.now() - startTime) /1000);
-  const seconds = totalSeconds + sessionSeconds;
+
+  const seconds = activityDuration(activity.data());
 
   // Stop the activity
   // Remove the in progress activity
@@ -159,7 +182,7 @@ app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
     conv.ask(`${activity_name} is not an activity in your Profile`);
     return
   }
-  const seconds = activity.data().total_seconds;
+  let seconds = activityDuration(activity.data());
   conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 
