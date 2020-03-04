@@ -53,6 +53,19 @@ app.intent('Add Activity', async (conv, {activity_name}) => {
   conv.ask(`Successfully added a new activity called: ${activity_name}`);
 });
 
+app.intent('Remove Activity', async (conv, {activity_name}) => {
+  const activityRef = db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').doc(activity_name);
+  const activity = await activityRef.get();
+  if (!activity.exists) {
+    conv.ask(`${activity_name} is not an activity in your Profile`);
+    return
+  }
+  await activityRef.delete();
+  conv.ask(`Successfully removed the activity: ${activity_name}`);
+});
+
 app.intent('List Activities', async (conv) => {
   const activities = await db.collection('users')
     .doc(conv.data.uid)
@@ -142,4 +155,4 @@ app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
   conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 
-module.exports.profilrFulfillment = functions.https.onRequest(app);
+exports.profilrFulfillment = functions.https.onRequest(app);
