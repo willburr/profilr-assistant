@@ -1,12 +1,26 @@
+const SECONDS_IN_HOUR = 3600;
+const SECONDS_IN_MINUTE = 60;
+
 const secondsToTimePhrase = (seconds) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainderSeconds = seconds % 60;
+  // Compute number of hours
+  const hours = Math.floor(seconds / SECONDS_IN_HOUR);
+  let secondsRemaining = seconds % SECONDS_IN_HOUR;
+
+  // Compute number of minutes and remaining seconds
+  const minutes = Math.floor(secondsRemaining / SECONDS_IN_MINUTE);
+  secondsRemaining = secondsRemaining % SECONDS_IN_MINUTE;
+
+  // Build time phrase
   let phrase = "";
+  if (hours !== 0) {
+    const plural = hours === 1 ? '' : 's';
+    phrase += `${hours} hour${plural} and `;
+  }
   if (minutes !== 0) {
     const plural = minutes === 1 ? '' : 's';
     phrase += `${minutes} minute${plural} and `;
   }
-  phrase += `${remainderSeconds} seconds`;
+  phrase += `${secondsRemaining} seconds`;
   return phrase;
 };
 
