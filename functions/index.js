@@ -73,6 +73,14 @@ app.intent('List Activities', async (conv) => {
   conv.ask(`Your profiled activities are: ${activities.docs.map(doc => doc.id)}`);
 });
 
+app.intent('Full Profile', async (conv) => {
+  const activities = await db.collection('users')
+    .doc(conv.data.uid)
+    .collection('activities').get();
+  const activitiesPhrase = activities.docs.map(doc => `${secondsToTimePhrase(doc.data().total_seconds)} ${doc.id}`);
+  conv.ask(`Your profile is as follows. You have spent ${activitiesPhrase}`);
+});
+
 app.intent('Start Activity', async (conv, {activity_name}) => {
   const userRef = db.collection('users').doc(conv.data.uid);
 
