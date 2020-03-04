@@ -20,7 +20,9 @@ const secondsToTimePhrase = (seconds) => {
     const plural = minutes === 1 ? '' : 's';
     phrase += `${minutes} minute${plural} and `;
   }
-  phrase += `${secondsRemaining} seconds`;
+
+  const plural = secondsRemaining === 1 ? '' : 's';
+  phrase += `${secondsRemaining} second${plural}`;
   return phrase;
 };
 
