@@ -108,6 +108,8 @@ app.intent('Full Profile', async (conv) => {
   conv.ask(`Your profile is as follows. You have spent ${activitiesPhrase}`);
 });
 
+// Start Activity
+
 app.intent('Start Activity', async (conv, {activity_name}) => {
   const userRef = db.collection('users').doc(conv.data.uid);
 
@@ -123,7 +125,9 @@ app.intent('Start Activity', async (conv, {activity_name}) => {
   const activity = await activityRef.get();
 
   if (!activity.exists) {
-    conv.ask(`${activity_name} is not an activity in your Profile`);
+    conv.followup('start_activity_add_activity', {
+      activity_name: activity_name
+    });
     return;
   }
   // Set activity to start
@@ -137,6 +141,34 @@ app.intent('Start Activity', async (conv, {activity_name}) => {
   }, {merge: true});
   conv.ask(`Started profiling activity: ${activity_name}`);
 });
+
+app.intent('Start Activity - add Activity', (conv, {activity_name}) => {
+  conv.data.activity_name = activity_name;
+  conv.ask(`${activity_name} is not an activity in your Profile. Would you like me to add it to your Profile?`);
+});
+
+app.intent('Start Activity - add Activity - yes', async (conv) => {
+  const activity_name = conv.data.activity_name;
+  const userRef = db.collection('users').doc(conv.data.uid);
+  // Set activity to start
+  await userRef.set({
+    activity_in_progress: activity_name
+  }, {merge: true});
+  // Get the activity to start
+  const activityRef = userRef.collection('activities').doc(activity_name);
+  // Start timing the activity
+  await activityRef.set({
+    start_time: Date.now(),
+    total_seconds: 0
+  });
+  conv.ask(`Started profiling new activity: ${activity_name}`);
+});
+
+app.intent('Start Activity - add Activity - no', async (conv) => {
+  conv.ask(`Ok.`);
+});
+
+
 
 app.intent('Stop Activity', async (conv, {activity_name}) => {
   const userRef = db.collection('users').doc(conv.data.uid);
