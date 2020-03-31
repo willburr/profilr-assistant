@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
-const { secondsToTimePhrase, activityDuration } = require('./utils');
+const { secondsToTimePhrase, sessionSeconds } = require('./utils');
 const {dialogflow, SignIn} = require('actions-on-google');
 const app = dialogflow({
   debug: true,
@@ -191,8 +191,10 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
     conv.ask(`${activity_name} is not an activity in your Profile`);
     return;
   }
+  const activityData = activity.data();
 
-  const seconds = activityDuration(activity.data());
+  const seconds = sessionSeconds(activityData);
+  const totalSeconds = activityData.total_seconds + seconds;
 
   // Stop the activity
   // Remove the in progress activity
@@ -203,10 +205,10 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
   // Set the new time profile for the activity
   await activityRef.set({
     start_time: null,
-    total_seconds: seconds
+    total_seconds: totalSeconds
   }, {merge: true});
 
-  conv.ask(`You spent ${secondsToTimePhrase(sessionSeconds)} ${activity_name}`);
+  conv.ask(`You spent ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 
 app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
@@ -218,7 +220,8 @@ app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
     conv.ask(`${activity_name} is not an activity in your Profile`);
     return
   }
-  let seconds = activityDuration(activity.data());
+  const activityData = activity.data();
+  const seconds = activityData.total_seconds + sessionSeconds(activityData);
   conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
 });
 

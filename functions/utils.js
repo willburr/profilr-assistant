@@ -27,13 +27,14 @@ const secondsToTimePhrase = (seconds) => {
   return phrase;
 };
 
-const activityDuration = activity => {
-  let seconds = activity.total_seconds;
+
+const sessionSeconds = (activity) => {
   const startTime = activity.start_time;
+  let seconds = 0;
   if (startTime) {
-    seconds += Math.floor((Date.now() - startTime) / MILLISECONDS_IN_SECONDS);
+    seconds = Math.floor((Date.now() - startTime) / MILLISECONDS_IN_SECONDS);
   }
   return seconds;
 };
 
-module.exports = { secondsToTimePhrase, activityDuration };
+module.exports = { secondsToTimePhrase, sessionSeconds };
