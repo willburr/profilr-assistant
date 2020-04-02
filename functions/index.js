@@ -1,7 +1,8 @@
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
-const { secondsToTimePhrase, sessionSeconds } = require('./utils');
+const { sessionSeconds } = require('./utils');
 const {dialogflow, SignIn} = require('actions-on-google');
+const { Speaker } = require("./speech");
 const app = dialogflow({
   debug: true,
   clientId: functions.config().profilr.id
@@ -11,10 +12,10 @@ admin.initializeApp(functions.config().firebase);
 const auth = admin.auth();
 
 const db = admin.firestore();
-
+const speaker = new Speaker();
 
 app.intent('Welcome Intent', (conv) => {
-  conv.ask(new SignIn('In order to save your Profile'))
+  conv.ask(new SignIn(speaker.reasonForSignIn()))
 });
 
 app.intent('Get Signin', async (conv, params, signin) => {
@@ -35,7 +36,7 @@ app.intent('Get Signin', async (conv, params, signin) => {
       conv.data.uid = (await auth.createUser({email})).uid;
     }
   }
-  conv.ask(`Hi ${conv.user.profile.payload.name}! What are you up to?`);
+  conv.ask(speaker.welcome(conv.user.profile.payload.name));
 });
 
 app.intent('Add Activity', async (conv, {activity_name}) => {
@@ -44,14 +45,14 @@ app.intent('Add Activity', async (conv, {activity_name}) => {
     .collection('activities').doc(activity_name);
   const activity = await activityRef.get();
   if (activity.exists) {
-    conv.ask(`${activity_name} is already an activity in your Profile`);
+    conv.ask(speaker.activityAlreadyExists(activity_name));
     return
   }
   await activityRef.set({
     total_seconds: 0,
     start_time: null
   });
-  conv.ask(`Successfully added a new activity called: ${activity_name}`);
+  conv.ask(speaker.activityAdded(activity_name));
 });
 
 // Remove Activity
@@ -62,11 +63,11 @@ app.intent('Remove Activity', async (conv, {activity_name}) => {
     .collection('activities').doc(activity_name);
   const activity = await activityRef.get();
   if (!activity.exists) {
-    conv.ask(`${activity_name} is not an activity in your Profile`);
+    conv.ask(speaker.activityDoesNotExist(activity_name));
     return
   }
   conv.data.activity_name = activity_name;
-  conv.ask(`Are you sure you wish to remove ${activity_name} from your profiled activities?`);
+  conv.ask(speaker.checkRemoveActivity(activity_name));
 });
 
 app.intent('Remove Activity - yes', async (conv) => {
@@ -75,18 +76,18 @@ app.intent('Remove Activity - yes', async (conv) => {
     .doc(conv.data.uid)
     .collection('activities').doc(activity_name);
   await activityRef.delete();
-  conv.ask(`Successfully removed ${activity_name} from your activities.`);
+  conv.ask(speaker.removedActivity(activity_name));
 });
 
 app.intent('Remove Activity - no', async (conv) => {
-  conv.ask(`Ok.`);
+  conv.ask(speaker.cancelAction());
 });
 
 app.intent('List Activities', async (conv) => {
   const activities = await db.collection('users')
     .doc(conv.data.uid)
     .collection('activities').get();
-  conv.ask(`Your profiled activities are: ${activities.docs.map(doc => doc.id)}`);
+  conv.ask(speaker.listActivities(activities.docs.map(doc => doc.id)));
 });
 
 app.intent('Current Activity', async (conv) => {
@@ -94,18 +95,22 @@ app.intent('Current Activity', async (conv) => {
     .doc(conv.data.uid).get();
   const activity = userRef.data().activity_in_progress;
   if (!activity) {
-    conv.ask('You have no activity in progress.');
+    conv.ask(speaker.noActivityInProgress());
     return;
   }
-  conv.ask(`You are currently ${activity}.`);
+  conv.ask(speaker.activityInProgress(activity));
 });
 
 app.intent('Full Profile', async (conv) => {
   const activities = await db.collection('users')
     .doc(conv.data.uid)
     .collection('activities').get();
-  const activitiesPhrase = activities.docs.map(doc => `${secondsToTimePhrase(doc.data().total_seconds)} ${doc.id}`);
-  conv.ask(`Your profile is as follows. You have spent ${activitiesPhrase}`);
+  const activityTimes = [];
+  activities.docs.forEach(doc => {
+    const activityData = doc.data();
+    activityTimes.push({name: doc.id, seconds: sessionSeconds(activityData) + activityData.total_seconds})
+  });
+  conv.ask(speaker.fullProfile(activityTimes));
 });
 
 // Start Activity
@@ -117,7 +122,7 @@ app.intent('Start Activity', async (conv, {activity_name}) => {
   const startActivity = await userRef.get();
   const existingActivity = startActivity.data().activity_in_progress;
   if (existingActivity){
-    conv.ask(`${existingActivity} is already in progress.`);
+    conv.ask(speaker.otherActivityInProgress(existingActivity));
     return;
   }
   // Get the activity to start
@@ -139,12 +144,12 @@ app.intent('Start Activity', async (conv, {activity_name}) => {
   await activityRef.set({
     start_time: Date.now()
   }, {merge: true});
-  conv.ask(`Started profiling activity: ${activity_name}`);
+  conv.ask(speaker.startedActivity(activity_name));
 });
 
 app.intent('Start Activity - add Activity', (conv, {activity_name}) => {
   conv.data.activity_name = activity_name;
-  conv.ask(`${activity_name} is not an activity in your Profile. Would you like me to add it to your Profile?`);
+  conv.ask(speaker.promptToAddActivity(activity_name));
 });
 
 app.intent('Start Activity - add Activity - yes', async (conv) => {
@@ -161,13 +166,12 @@ app.intent('Start Activity - add Activity - yes', async (conv) => {
     start_time: Date.now(),
     total_seconds: 0
   });
-  conv.ask(`Started profiling new activity: ${activity_name}`);
+  conv.ask(speaker.startedActivity(activity_name));
 });
 
 app.intent('Start Activity - add Activity - no', async (conv) => {
-  conv.ask(`Ok.`);
+  conv.ask(speaker.cancelAction());
 });
-
 
 
 app.intent('Stop Activity', async (conv, {activity_name}) => {
@@ -177,10 +181,10 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
   const startActivity = await userRef.get();
   const existingActivity = startActivity.data().activity_in_progress;
   if (!existingActivity) {
-    conv.ask('There is no activity in progress.');
+    conv.ask(speaker.activityNotInProgress(activity_name));
     return;
   } else if (existingActivity !== activity_name){
-    conv.ask(`A different activity is in progress: ${existingActivity}.`);
+    conv.ask(speaker.otherActivityInProgress(activity_name));
     return;
   }
 
@@ -188,7 +192,7 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
   const activityRef = userRef.collection('activities').doc(activity_name);
   const activity = await activityRef.get();
   if (!activity.exists) {
-    conv.ask(`${activity_name} is not an activity in your Profile`);
+    conv.ask(speaker.activityDoesNotExist(activity_name));
     return;
   }
   const activityData = activity.data();
@@ -208,7 +212,7 @@ app.intent('Stop Activity', async (conv, {activity_name}) => {
     total_seconds: totalSeconds
   }, {merge: true});
 
-  conv.ask(`You spent ${secondsToTimePhrase(seconds)} ${activity_name}`);
+  conv.ask(speaker.activitySessionDuration(activity_name, seconds));
 });
 
 app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
@@ -222,7 +226,7 @@ app.intent('How Long Have I Spent', async (conv, {activity_name}) => {
   }
   const activityData = activity.data();
   const seconds = activityData.total_seconds + sessionSeconds(activityData);
-  conv.ask(`You have spent a total of ${secondsToTimePhrase(seconds)} ${activity_name}`);
+  conv.ask(speaker.activityTotalDuration(seconds));
 });
 
 exports.profilrFulfillment = functions.https.onRequest(app);
