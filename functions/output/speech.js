@@ -1,4 +1,4 @@
-const {secondsToTimePhrase} = require('./utils');
+const {secondsToTimePhrase} = require('../utils');
 
 class Speaker {
 
@@ -66,17 +66,17 @@ class Speaker {
     ]);
   }
 
-  listActivities(activityNames) {
-    if (activityNames.length === 0) {
+  listActivities(activities) {
+    if (activities.length === 0) {
       return `You have no profiled activities. If you would like to add an activity, let me know!`
-    } else if (activityNames.length === 1) {
+    } else if (activities.length === 1) {
       return this.randomElement([
-        `You have one profiled activity which is ${activityNames[0]}.`,
-        `${activityNames[0]} is the only activity in your profile.`
+        `You have one profiled activity which is ${activities[0].name}.`,
+        `${activities[0].name} is the only activity in your profile.`
       ])
     }
-    const length = activityNames.length;
-    const activitiesTerm = `${activityNames.slice(0, length - 1)} and ${activityNames[length - 1]}`;
+    const length = activities.length;
+    const activitiesTerm = `${activities.slice(0, length - 1).map(a => a.name)} and ${activities[length - 1].name}`;
     return this.randomElement([
       `The activities in your profile are ${activitiesTerm}.`,
       `Your activities are ${activitiesTerm}.`
@@ -122,7 +122,7 @@ class Speaker {
   startedActivity(activityName) {
     return this.randomElement([
       `Started profiling activity: ${activityName}.`,
-      `You are now ${activity_name}. Get going.`
+      `You are now ${activityName}. Get going.`
     ]);
   }
 

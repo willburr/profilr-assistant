@@ -15,7 +15,7 @@ const secondsToTimePhrase = (seconds) => {
   let phrase = "";
   if (hours !== 0) {
     const plural = hours === 1 ? '' : 's';
-    phrase += `${hours} hour${plural} and `;
+    phrase += `${hours}  hour${plural} and `;
   }
   if (minutes !== 0) {
     const plural = minutes === 1 ? '' : 's';
